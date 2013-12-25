@@ -1,0 +1,108 @@
+(ns blazar.http.server-actors
+  (:refer-clojure :exclude [promise await])
+  (:use clojure.core.typed)
+  (:require
+    [org.httpkit.server :as h]
+    [co.paralleluniverse.pulsar.core :as pc]
+    [co.paralleluniverse.pulsar.actors :as pa])
+  (:import (co.paralleluniverse.actors ActorRef)
+           (clojure.lang IPersistentMap)))
+
+(set! *warn-on-reflection* true)
+
+; Handy forward-declarations
+(declare server-factory factory server handler close-handler send-handler receive-handler)
+
+(ann ^:no-check server-factory [ActorRef -> ActorRef])
+(defn ^ActorRef server-factory
+  "Returns, building it beforehand if needed, the server factory singleton actor"
+  [^ActorRef counterpart] ; Factory actor
+  (swap!
+    factory (ann-form #(or %&) [Any * -> Any])
+    (pa/spawn
+      (ann-form
+        #(loop []
+                (pa/receive
+                  [:bind [:hostname hostname :port port]]
+                    (pa/! counterpart (server @pa/self counterpart hostname port)))
+                (recur))
+        [-> Nothing]))))
+
+(atom> ^:private
+;  "Atom storing the server factory single actor"
+  ActorRef factory) ; Singleton, doesn't make sense to have more than one
+
+(ann ^:no-check server [ActorRef ActorRef String Integer -> ActorRef])
+(defn- ^ActorRef server
+  "Returns the server manager actor"
+  [^ActorRef factory ^ActorRef counterpart ^String hostname ^Integer port wrapping] ; Server actor
+  (pa/spawn
+    (ann-form
+      #(let [ring-handler (ann-form (partial handler @pa/self counterpart) [(HMap) -> (HMap)])]
+        (pa/set-state!
+          (h/run-server
+            ((if (ifn? wrapping) wrapping identity) ring-handler)
+            {:ip (or hostname "0.0.0.0") :port (or port 8080)}))
+        (pa/! counterpart {:bound {:hostname hostname :port port}})
+        (pa/receive
+          :stop
+          (let [p (ann-form (pc/promise) (Atom1 Any)) ]
+            (pc/spawn-thread (ann-form (fn [] (deliver p (@pa/state))) [-> Any]))
+            @p)))
+      [-> Any])))
+
+(ann handler [ActorRef ActorRef (HMap) -> ActorRef])
+(defn- ^ActorRef handler
+  "Returns the transient request actor; it will just spawn three handler actors"
+  [^ActorRef server ^ActorRef counterpart req] ; Transient actor that will spawn specific ones
+  (h/with-channel
+    req ch
+    (pa/spawn
+      (ann-form
+        #(pa/! counterpart
+               {:bound
+                 {:handler @pa/self
+                  :websocket (h/websocket? ch)
+                  :close-handler (close-handler @pa/self counterpart ch)
+                  :receive-handler (receive-handler @pa/self counterpart ch)
+                  :send-handler (send-handler @pa/self ch)}})
+        [-> nil])
+      :mailbox-size 0
+      :overflow-policy :drop)))
+
+(ann receive-handler [ActorRef ActorRef Any -> ActorRef])
+(defn- ^ActorRef receive-handler
+  "Data reception (request or websocket) receive-only actor"
+  [^ActorRef handler ^ActorRef counterpart ch] ; Receive-event handler actor
+  (pa/spawn
+    (ann-form
+      #(loop []
+              (pa/! counterpart {:data (pc/await h/on-receive ch)}) ; TODO check that it will die when closed
+              (recur))
+      [-> Nothing])
+    :mailbox-size 0
+    :overflow-policy :drop))
+
+(ann close-handler [ActorRef ActorRef Any -> ActorRef])
+(defn- ^ActorRef close-handler
+  "Connection closing receive-only actor"
+  [^ActorRef handler ^ActorRef counterpart ch] ; Close-event handler actor
+  (pa/spawn
+    (ann-form
+      #(do
+        (pc/await h/on-close ch)
+        (pa/! counterpart {:closed @pa/self}))
+      [-> nil])
+    :mailbox-size 0
+    :overflow-policy :drop))
+
+(ann ^:no-check send-handler [ActorRef ActorRef Any -> ActorRef])
+(defn- ^ActorRef send-handler
+  "Data sending (request or websocket) send-only actor"
+  [^ActorRef handler ^ActorRef counterpart ch] ; Send handling actor
+  (pa/spawn
+    (ann-form
+      #(loop []
+              (pa/receive
+                [:msg msg :close close] (do (h/send! ch msg close) (if (not close) (recur)))))
+      [-> Nothing])))
