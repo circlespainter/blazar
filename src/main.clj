@@ -24,18 +24,18 @@
         (do
           (debug "High-performance fiber-blocking Server connection handle @ ws[s]://localhost:8080 (loop): echoed, starting receive/echo loop")
           (loop [data first-data]
-            (if (and data (not (= data "!!!CLOSE!!!")))
+            (if (and data (not (= data {:ws-text "!!!CLOSE!!!"})) (not (:ws-close data)))
               (do
                 (debug "High-performance fiber-blocking Server connection handle @ ws[s]://localhost:8080 (loop): got data '" data "', echoing")
-                (bs/snd! full data)
+                (bs/snd! full (:ws-text data))
                 (debug "High-performance fiber-blocking Server connection handle @ ws[s]://localhost:8080 (loop): echoed, looping back to receive")
                 (recur (bs/rcv full)))
               (do
-                (debug "High-performance fiber-blocking Server connection handle @ ws[s]://localhost:8080 (loop): closing loop after receiving 'nil' or '!!!CLOSE!!!'")
+                (debug "High-performance fiber-blocking Server connection handle @ ws[s]://localhost:8080 (loop): closing loop after receiving" data)
                 (bs/close! full)
-                (debug "High-performance fiber-blocking Server connection handle @ ws[s]://localhost:8080 (loop): closed, now unlistening")
+                (debug "High-performance fiber-blocking Server connection handle @ ws[s]://localhost:8080 (loop): closed, now unbinding")
                 (bs/unbind! srv)
-                (debug "High-performance fiber-blocking Server connection handle @ ws[s]://localhost:8080 (loop): unlistened and exiting")
+                (debug "High-performance fiber-blocking Server connection handle @ ws[s]://localhost:8080 (loop): unbound and exiting")
                 (utils/unrecord-fiber :main-server-handle (bs/ch-id full))
                 ; TODO check: there shouldn't be active/blocked fibers anymore, the program should exit
                 ))))
@@ -62,16 +62,19 @@
          srv (bs/bind! "localhost" 8080)]
       (debug "High-performance fiber-blocking Server @ [http|ws]://localhost:8080 active, activating client by sending 'GO' over client-sync channel")
       (pc/snd client-boot-channel "GO")
-      ; (debug "High-performance fiber-blocking Server @ [http|ws]://localhost:8080 active, initiating serving loop")
-      ; (loop []
+      (debug "High-performance fiber-blocking Server @ [http|ws]://localhost:8080 active, initiating serving loop")
+      (loop []
         (debug "High-performance fiber-blocking Server @ [http|ws]://localhost:8080: getting incoming connection")
         (let [handle (bs/listen! srv)]
-          (debug "High-performance fiber-blocking Server @ [http|ws]://localhost:8080: got connection, handing it to the handler")
-          (utils/record-fiber :main-server-handle (bs/ch-id handle) (pc/spawn-fiber server-connection-handler [handle srv]))
-          (debug "High-performance fiber-blocking Server @ [http|ws]://localhost:8080: exiting")
-          (utils/unrecord-fiber :main-server "server"))
-        ;(recur))
-    )
+					(if handle
+						(do
+							(debug "High-performance fiber-blocking Server @ [http|ws]://localhost:8080: got connection, handing it to the handler")
+							(utils/record-fiber :main-server-handle (bs/ch-id handle) (pc/spawn-fiber server-connection-handler [handle srv]))
+							(debug "High-performance fiber-blocking Server @ [http|ws]://localhost:8080: handed connection to the handler")
+							(recur))
+						(do
+							(debug "High-performance fiber-blocking Server @ [http|ws]://localhost:8080: got nil, exiting serving loop")
+							(utils/unrecord-fiber :main-server "server"))))))
     (catch Throwable t
       (do
         (fatal t "High-performance fiber-blocking Server got exception, dying!")
@@ -87,7 +90,7 @@
       (debug "High-performance fiber-blocking Client @ http://localhost:8080: '" (bc/http-get "http://localhost:8080" {}) "' response received")
       (debug "High-performance fiber-blocking Client @ http://localhost:8080: exiting")
       (utils/unrecord-fiber :main-client "client")
-      (comment let [_ (debug "High-performance fiber-blocking Client:, opening 'ws://localhost:8080'") ws1 (bc/ws-open! "ws://localhost:8080")]
+      (let [_ (debug "High-performance fiber-blocking Client:, opening 'ws://localhost:8080'") ws1 (bc/ws-open! "ws://localhost:8080")]
         (debug "High-performance fiber-blocking Client @ ws://localhost:8080: websocket opened successfully")
         (debug "High-performance fiber-blocking Client @ ws://localhost:8080: sending 'Yo!'")
         (bc/ws-snd! ws1 "Yo!")
@@ -128,8 +131,7 @@
                   (or (timbre/stacktrace throwable "\n" (when nofonts? {})) "")))))
 
     (let
-        [dumping-fiber (utils/start-new-runtime-dumping-fiber! 50 1000)
-
+        [
          client-boot-channel (pc/channel)
          _ (debug "Spawning server fiber")
          server-fiber
@@ -146,7 +148,4 @@
       (debug "Joined client")
       (debug "Joining server")
       (pc/join server-fiber)
-      (debug "Joined server")
-      (debug "Joining dumping fiber")
-      (pc/join dumping-fiber)
-      (debug "Joined dumping fiber, exiting"))))
+      (debug "Joined server, exiting"))))

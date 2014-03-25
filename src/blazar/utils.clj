@@ -21,16 +21,11 @@
 
 (def ^:private fibers (atom {}))
 
-(defn start-new-runtime-dumping-fiber! [millis & args]
-  (pc/spawn-fiber
-    #(loop [count (if-let [[n] args] n -1)]
-      (Strand/sleep millis)
-      (debug "[DUMP]" (keys @fibers))
-      (if (> count 0) (recur (- count 1))))))
-
 (defn record-fiber [type id fiber]
-  (swap! fibers #(merge % {[type id] fiber})))
+  (swap! fibers #(merge % {[type id] fiber}))
+	(debug "[DUMP]" (keys @fibers)))
 
 (defn unrecord-fiber [type id]
-  (swap! fibers #(dissoc % [type id])))
+  (swap! fibers #(dissoc % [type id]))
+	(debug "[DUMP]" (keys @fibers)))
 

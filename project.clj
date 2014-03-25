@@ -33,36 +33,34 @@
    [ns-tracker "0.2.1"]
    ; [org.clojure/core.match "0.2.0"] ; Implicit
    ; [org.clojure/core.typed "0.2.17"] ; Implicit
-   ; [co.paralleluniverse/quasar-core "0.4.0-SNAPSHOT"] ; Implicit
-   [co.paralleluniverse/pulsar "0.4.0-SNAPSHOT"]
-   [http-kit "2.1.13"] ; For http + websocket server support and http client support
-   [aleph "0.3.0"]]    ; For websocket client support
+   ; [co.paralleluniverse/quasar-core "0.4.0"] ; Implicit
+   [co.paralleluniverse/pulsar "0.5.0-SNAPSHOT"]
+   [http-kit "2.1.16"] ; For http + websocket server support and http client support
+	 [stylefruits/gniazdo "0.1.0"]]    ; For websocket client support
 
   :plugins
   [[lein-clojars "0.9.1"]
    [lein-webrepl "0.1.0-SNAPSHOT"]
    [lein-marginalia "0.7.1"]
    [lein-pprint "1.1.1"]
-   [codox "0.6.4"]
-   [lein-bin "0.2.0"]
-   [lein-servlet "0.2.0"]
-   [lein-ring "0.8.5"]
+   [codox "0.6.7"]
+   [lein-bin "0.3.4"]
+   [lein-servlet "0.3.0"]
+   [lein-ring "0.8.10"]
    [lein-tar "2.0.0"]
-   [lein-html5-docs "2.0.0"]
-   [lein-embongo "0.2.1"]
+   [lein-html5-docs "2.0.2"]
    [lein-licenses "0.1.1"]
-   [lein-beanstalk "0.2.7"]
-   [lein-sub "0.2.4"]
-   [lein-outdated "1.0.1"]
+   [lein-sub "0.3.0"]
+   [lein-ancient "0.5.4"]
    [lein-nevam "0.1.2"]
-   [lein-localrepo "0.4.1"]
-   [lein-exec "0.3.0"]
+   [lein-localrepo "0.5.3"]
+   [lein-exec "0.3.2"]
    [lein-clean-m2 "0.1.2"]
-   [lein-cljsbuild "0.3.2"]
-   [lein-droid "0.1.0-preview5"]
+   [lein-cljsbuild "1.0.2"]
+   [lein-droid "0.2.2"]
    [lein-deps-tree "0.1.2"]
    [lein-environ "0.4.0"]
-   [lein-typed "0.3.1"]]
+   [lein-typed "0.3.3"]]
 
   ; :core.typed
   ; {:check [blazar.http]}
@@ -71,7 +69,7 @@
 
 
   :java-agents
-  [[co.paralleluniverse/quasar-core "0.4.0-SNAPSHOT"]]
+  [[co.paralleluniverse/quasar-core "0.5.0-SNAPSHOT"]]
 
   :main main
 )

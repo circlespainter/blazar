@@ -37,20 +37,6 @@
           (unrecord-fiber :api-server-temp-http-response id)
           (throw t)))))))
 
-(defn- spawn-temp-onreceive-fiber [id httpkit-data-channel data]
-  (record-fiber :api-server-temp-http-onreceive id (pc/spawn-fiber
-    #(try
-      (do
-        (debug "[Blazar server API: temp  for http-kit's 'on-receive'] Forwarding '" data "' (connection '" id "') to managing fiber")
-        (pc/snd httpkit-data-channel data)
-        (debug "[Blazar erver API: temp fiber for http-kit's 'on-receive'] Forwarded '" data "' (connection '" id "') to managing fiber, exiting")
-        (unrecord-fiber :api-server-temp-http-onreceive id))
-      (catch Throwable t
-        (do
-          (fatal t "[Blazar server API: temp fiber for http-kit's 'on-receive'] Got exception (connection '" id "'), dying!")
-          (unrecord-fiber :api-server-temp-http-onreceive id)
-          (throw t)))))))
-
 (defn- spawn-server-sending-fiber [ch public-channel-snd comms]
   (let [id (ch-id ch)]
     (record-fiber :api-server-sending id (pc/spawn-fiber
@@ -74,7 +60,7 @@
             (unrecord-fiber :api-server-sending id)
             (throw t))))))))
 
-(defn- spawn-onreceivemanaging-fiber [id httpkit-data-channel public-channel-rcv comms]
+(defn- spawn-onreceivemanaging-fiber [proto id httpkit-data-channel public-channel-rcv comms]
   (record-fiber :api-server-on-receive-managing id (pc/spawn-fiber
     #(try
       (do
@@ -83,7 +69,7 @@
           (if-let [d (pc/rcv httpkit-data-channel)]
             (do
               (debug "[Blazar server API: 'on-receive'-managing fiber] Received client (HTTP) data '" d "' (connection '" id "'), forwarding to handle")
-              (pc/snd public-channel-rcv d)
+              (pc/snd public-channel-rcv {(if (= proto :ws) :ws-text :http-req) d})
               (debug "[Blazar server API: 'on-receive'-managing fiber] Received client (HTTP) data '" d "' (connection '" id "'), forwarded to handle; looping back")
               (recur))
             (do
@@ -96,6 +82,25 @@
           (fatal t "[Blazar server API: 'on-receive'-managing fiber] Got exception (connection '" id "'), dying!")
           (unrecord-fiber :api-server-on-receive-managing id)
           (throw t)))))))
+
+(defn- spawn-onclosemanaging-fiber [id httpkit-ws-close-channel httpkit-data-channel public-channel-rcv comms]
+	(record-fiber :api-server-on-close-managing id (pc/spawn-fiber
+		#(try
+			(do
+				(debug "[Blazar server API: 'on-close'-managing fiber] (connection '" id "')")
+				(when-let [d (pc/rcv httpkit-ws-close-channel)]
+					(do
+						(debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), forwarding to handle")
+						(pc/snd public-channel-rcv {:ws-close d})
+						(debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), forwarded to handle and now closing")
+						(close-comms! (concat [httpkit-ws-close-channel httpkit-data-channel public-channel-rcv] comms))
+						(debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), closed and now exiting")
+						(unrecord-fiber :api-server-on-close-managing id))))
+			(catch Throwable t
+				(do
+					(fatal t "[Blazar server API: 'on-close'-managing fiber] Got exception (connection '" id "'), dying!")
+					(unrecord-fiber :api-server-on-close-managing id)
+					(throw t)))))))
 
 (defn- send-handle! [ch [_ {r :rcv id :ch-id} :as h]]
   (do
@@ -116,13 +121,15 @@
 (defn- handler
   "Returns the Blazar ring handler"
   [handler-fiber-channels-return-channel req]
-  (let [httpkit-data-channel (pc/channel)]
+  (let [httpkit-data-channel (pc/channel -1) httpkit-ws-close-channel (pc/channel 1)]
     (debug "[Blazar server API: http-kit's ring handler] Got incoming request")
     (h/with-channel
       req ch
       (let [ch-id (ch-id ch)]
         (if (h/websocket? ch)
-          (h/on-receive ch #(spawn-temp-onreceive-fiber ch-id httpkit-data-channel %))
+          (do
+						(h/on-receive ch #(when % (pc/snd httpkit-data-channel %)))
+						(h/on-close ch #(when % (pc/snd httpkit-ws-close-channel %))))
           (spawn-temp-httpresponse-fiber ch-id httpkit-data-channel req))
         (let
             [proto (if (h/websocket? ch) :ws :http)
@@ -131,7 +138,8 @@
             comms [httpkit-data-channel public-channel-snd public-channel-rcv]
             handle {:ch-id ch-id :snd public-channel-snd :rcv public-channel-rcv}]
           (spawn-server-sending-fiber ch public-channel-snd comms)
-          (spawn-onreceivemanaging-fiber ch-id httpkit-data-channel public-channel-rcv comms)
+          (spawn-onreceivemanaging-fiber proto ch-id httpkit-data-channel public-channel-rcv comms)
+					(when (= proto :ws) (spawn-onclosemanaging-fiber ch-id httpkit-ws-close-channel httpkit-data-channel public-channel-rcv comms))
           (send-handle! handler-fiber-channels-return-channel [proto handle]))))))
 
 (defn closed? [& args]
@@ -157,20 +165,25 @@
     (debug "[Blazar server API] Listening based on '" args "', returning")
     ret))
 
-(defn unbind! [{f :close-function :as full}]
+(defn unbind! [{c :handler-fiber-channels-return-channel f :close-function :as full}]
   "API: destroy an httpkit instance"
   (let
-      [_ (debug "[Blazar server API] Unlistening")
-       ret (f)]
-    (debug "[Blazar server API] Unlistened, returning '" ret "'")))
+      [
+				_ (debug "[Blazar server API] Closing connections return channel")
+				_ (pc/close! c)
+				_ (debug "[Blazar server API] Closed connections return channel, unlistening")
+				ret (f)
+				_ (debug "[Blazar server API] Unlistened")
+			]
+    (debug "[Blazar server API] Returning '" ret "'")))
 
 (pc/defsfn listen! [{c :handler-fiber-channels-return-channel :as full}]
   "Fiber-blocking API: blocks the calling fiber until it gets a new connection handle from
   a server (or nil if server closed)"
   (let
       [_ (debug "[Blazar server API] Getting connection from server")
-       [_ {id :ch-id} :as ret] (pc/rcv c)]
-    (debug "[Blazar server API] Got connection from server: returning '" id "'")
+       ret (pc/rcv c)]
+    (debug "[Blazar server API] Got connection (or nil) from server: returning '" ret "'")
     ret))
 
 (pc/defsfn close!
