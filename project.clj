@@ -28,15 +28,15 @@
        "-XX:+TieredCompilation"]}}
 
   :dependencies
-  [[org.clojure/clojure "1.5.1"]
-   [com.taoensso/timbre "3.0.0-RC2"]
-   [ns-tracker "0.2.1"]
+  [[org.clojure/clojure "1.6.0"]
+   [com.taoensso/timbre "3.2.1"]
+   [ns-tracker "0.2.2"]
    ; [org.clojure/core.match "0.2.0"] ; Implicit
    ; [org.clojure/core.typed "0.2.17"] ; Implicit
    ; [co.paralleluniverse/quasar-core "0.4.0"] ; Implicit
-   [co.paralleluniverse/pulsar "0.5.0-SNAPSHOT"]
+   [co.paralleluniverse/pulsar "0.5.0"]
    [http-kit "2.1.16"] ; For http + websocket server support and http client support
-	 [stylefruits/gniazdo "0.1.0"]]    ; For websocket client support
+   [stylefruits/gniazdo "0.2.1"]]    ; For websocket client support
 
   :plugins
   [[lein-clojars "0.9.1"]
@@ -69,7 +69,7 @@
 
 
   :java-agents
-  [[co.paralleluniverse/quasar-core "0.5.0-SNAPSHOT"]]
+  [[co.paralleluniverse/quasar-core "0.5.0"]]
 
   :main main
 )
