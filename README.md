@@ -1,6 +1,8 @@
-# Blazar <br/>Straightforward, lightning-fast fiber-blocking HTTP/WebSocket Client and Server APIs for Clojure
+# blazar
 
-Blazar uses:
+Straightforward, lightning-fast fiber-blocking HTTP/WebSocket Client and Server APIs for Clojure.
+
+*blazar* uses:
 
 - The [Timbre](https://github.com/ptaoussanis/timbre) Clojure logging framework
 - [http-kit](http://http-kit.org/)'s asynchronous HTTP/WebSocket Server and HTTP Client APIs
