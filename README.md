@@ -17,7 +17,7 @@ Clojure 1.6 is required to run Blazar.
 
 ## Usage
 
-See the [blazar.examples](../blob/master/src/blazar/examples) package
+See the [blazar.examples](../master/src/blazar/examples) package
 
 ## License
 
