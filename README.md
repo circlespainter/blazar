@@ -23,7 +23,7 @@ Server example:
 (ns main
   (:use
     [co.paralleluniverse.pulsar.core
-      :only [spawn-fiber]
+      :only [spawn-fiber]]
     blazar.http.server))
 
 (defn -main []
@@ -65,7 +65,7 @@ HTTP Client example:
 (ns main
   (:use
     [co.paralleluniverse.pulsar.core
-      :only [spawn-fiber]
+      :only [spawn-fiber]]
     blazar.http.client))
 
 (defn -main []
@@ -81,7 +81,7 @@ HTTP WebSocket example:
 (ns main
   (:use
     [co.paralleluniverse.pulsar.core
-      :only [spawn-fiber]
+      :only [spawn-fiber]]
     blazar.http.client))
 
 (defn -main []
