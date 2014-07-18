@@ -1,13 +1,14 @@
 (ns blazar.http.server
-  (:import (co.paralleluniverse.strands Strand)
-					 (java.util.concurrent TimeUnit))
+  (:import
+    (co.paralleluniverse.strands Strand)
+    (java.util.concurrent TimeUnit))
   (:refer-clojure :exclude [promise await])
   (:require
     [clojure.core.match :as m]
     [taoensso.timbre :as timbre
-      :refer (log  trace  debug  info  warn  error  fatal  report
-                   logf tracef debugf infof warnf errorf fatalf reportf
-                   spy logged-future with-log-level)]
+      :refer (log trace  debug  info  warn  error  fatal  report
+              logf tracef debugf infof warnf errorf fatalf reportf
+              spy logged-future with-log-level)]
     [org.httpkit.server :as h]
     [co.paralleluniverse.pulsar.core :as pc]
     [co.paralleluniverse.pulsar.actors :as pa]
@@ -85,23 +86,23 @@
           (throw t)))))))
 
 (defn- spawn-onclosemanaging-fiber [id httpkit-ws-close-channel httpkit-data-channel public-channel-rcv comms]
-	(record-fiber :api-server-on-close-managing id (pc/spawn-fiber
-		#(try
-			(do
-				(debug "[Blazar server API: 'on-close'-managing fiber] (connection '" id "')")
-				(when-let [d (pc/rcv httpkit-ws-close-channel)]
-					(do
-						(debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), forwarding to handle")
-						(pc/snd public-channel-rcv {:ws-close d})
-						(debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), forwarded to handle and now closing")
-						(close-comms (concat [httpkit-ws-close-channel httpkit-data-channel public-channel-rcv] comms))
-						(debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), closed and now exiting")
-						(unrecord-fiber :api-server-on-close-managing id))))
-			(catch Throwable t
-				(do
-					(fatal t "[Blazar server API: 'on-close'-managing fiber] Got exception (connection '" id "'), dying!")
-					(unrecord-fiber :api-server-on-close-managing id)
-					(throw t)))))))
+  (record-fiber :api-server-on-close-managing id (pc/spawn-fiber
+    #(try
+      (do
+        (debug "[Blazar server API: 'on-close'-managing fiber] (connection '" id "')")
+        (when-let [d (pc/rcv httpkit-ws-close-channel)]
+          (do
+            (debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), forwarding to handle")
+            (pc/snd public-channel-rcv {:ws-close d})
+            (debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), forwarded to handle and now closing")
+            (close-comms (concat [httpkit-ws-close-channel httpkit-data-channel public-channel-rcv] comms))
+            (debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), closed and now exiting")
+            (unrecord-fiber :api-server-on-close-managing id))))
+      (catch Throwable t
+        (do
+          (fatal t "[Blazar server API: 'on-close'-managing fiber] Got exception (connection '" id "'), dying!")
+          (unrecord-fiber :api-server-on-close-managing id)
+          (throw t)))))))
 
 (defn- send-handle [ch [_ {r :rcv id :ch-id} :as h]]
   (do
@@ -129,8 +130,8 @@
       (let [ch-id (ch-id ch)]
         (if (h/websocket? ch)
           (do
-						(h/on-receive ch #(when % (pc/snd httpkit-data-channel %)))
-						(h/on-close ch #(when % (pc/snd httpkit-ws-close-channel %))))
+            (h/on-receive ch #(when % (pc/snd httpkit-data-channel %)))
+            (h/on-close ch #(when % (pc/snd httpkit-ws-close-channel %))))
           (spawn-temp-httpresponse-fiber ch-id httpkit-data-channel req))
         (let
             [proto (if (h/websocket? ch) :ws :http)
@@ -140,7 +141,7 @@
             handle {:ch-id ch-id :snd public-channel-snd :rcv public-channel-rcv}]
           (spawn-server-sending-fiber ch public-channel-snd comms)
           (spawn-onreceivemanaging-fiber proto ch-id httpkit-data-channel public-channel-rcv comms)
-					(when (= proto :ws) (spawn-onclosemanaging-fiber ch-id httpkit-ws-close-channel httpkit-data-channel public-channel-rcv comms))
+          (when (= proto :ws) (spawn-onclosemanaging-fiber ch-id httpkit-ws-close-channel httpkit-data-channel public-channel-rcv comms))
           (send-handle handler-fiber-channels-return-channel [proto handle]))))))
 
 (defn closed? [& args]
@@ -169,23 +170,23 @@
 (defn unbind [{c :handler-fiber-channels-return-channel f :close-function :as full}]
   "API: destroy an httpkit instance"
   (let
-		[
-			_ (debug "[Blazar server API] Closing connections return channel")
-			_ (pc/close! c)
-			_ (debug "[Blazar server API] Closed connections return channel, unlistening")
-			ret (f)
-			_ (debug "[Blazar server API] Unlistened")
-		]
-		(debug "[Blazar server API] Returning '" ret "'")))
+    [
+      _ (debug "[Blazar server API] Closing connections return channel")
+      _ (pc/close! c)
+      _ (debug "[Blazar server API] Closed connections return channel, unlistening")
+      ret (f)
+      _ (debug "[Blazar server API] Unlistened")
+    ]
+    (debug "[Blazar server API] Returning '" ret "'")))
 
 (pc/defsfn listen [{c :handler-fiber-channels-return-channel :as full} & {:keys [timeout timeout-unit] :or {timeout -1 timeout-unit (. TimeUnit SECONDS)}}]
-	"Fiber-blocking API: blocks the calling fiber until it gets a new connection handle from
-	a server (or nil if server closed)"
-	(let
-		[_ (debug "[Blazar server API] Getting connection from server")
-		 ret (cond (< timeout 0) (pc/rcv c) (= timeout 0) (pc/try-rcv c) (> timeout 0) (pc/rcv c timeout timeout-unit))]
-		(debug "[Blazar server API] Got connection (or nil) from server: returning '" ret "'")
-		ret))
+  "Fiber-blocking API: blocks the calling fiber until it gets a new connection handle from
+  a server (or nil if server closed)"
+  (let
+    [_ (debug "[Blazar server API] Getting connection from server")
+     ret (cond (< timeout 0) (pc/rcv c) (= timeout 0) (pc/try-rcv c) (> timeout 0) (pc/rcv c timeout timeout-unit))]
+    (debug "[Blazar server API] Got connection (or nil) from server: returning '" ret "'")
+    ret))
 
 (pc/defsfn close
   "Fiber-blocking API: closes a connection handle"
@@ -212,18 +213,18 @@
     ret))
 
 (pc/defsfn snd [[_ {s :snd  id :ch-id} :as full] data & {:keys [close? try?] :or {close? false try? false}}]
-	"Fiber-blocking API: sends data to a given connection handle"
-		(if (not (pc/closed? s))
-			(do
-				(debug "[Blazar server API] Sending data '" data "' over open connection '" id "'")
-				(let [ret (if try? (pc/try-snd s data) (pc/snd s data))]
-					(if close?
-						(do
-							(debug "[Blazar server API] Sent data '" data "' over open connection '" id "', closing as asked")
-							(close full)
-							(debug "[Blazar server API] Sent data '" data "' over open connection '" id "', closed"))
-						(debug "[Blazar server API] Sent data '" data "' over open connection '" id "', asked not to close"))
-					ret))
-			(do
-				(debug "[Blazar server API] Sending data '" data "' over open connection '" id "': already closed, not sending")
-				false)))
+  "Fiber-blocking API: sends data to a given connection handle"
+    (if (not (pc/closed? s))
+      (do
+        (debug "[Blazar server API] Sending data '" data "' over open connection '" id "'")
+        (let [ret (if try? (pc/try-snd s data) (pc/snd s data))]
+          (if close?
+            (do
+              (debug "[Blazar server API] Sent data '" data "' over open connection '" id "', closing as asked")
+              (close full)
+              (debug "[Blazar server API] Sent data '" data "' over open connection '" id "', closed"))
+            (debug "[Blazar server API] Sent data '" data "' over open connection '" id "', asked not to close"))
+          ret))
+      (do
+        (debug "[Blazar server API] Sending data '" data "' over open connection '" id "': already closed, not sending")
+        false)))
