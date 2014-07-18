@@ -2,7 +2,7 @@
 (defn build [] (System/getenv "BUILD"))
 
 (defproject
-  com.dreamtimecircles/blazar "0.1.0-SNAPSHOT"
+  com.dreamtimecircles/blazar "0.1.0"
 
   :description
     "High-performance framework for I/O and real-time distributed HTTP based on Pulsar actors
@@ -69,8 +69,8 @@
   :java-agents
     [[co.paralleluniverse/quasar-core "0.5.0"]]
 
-  :main
-    blazar.examples.svr
-  ; blazar.examples.httpclt
-  ; blazar.examples.wsclt
+  ; :main
+  ;   blazar.examples.svr
+  ;   blazar.examples.httpclt
+  ;   blazar.examples.wsclt
 )

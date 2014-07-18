@@ -62,7 +62,7 @@
             (unrecord-fiber :api-server-sending id)
             (throw t))))))))
 
-(defn- spawn-onreceivemanaging-fiber [proto id httpkit-data-channel public-channel-rcv comms]
+(defn- spawn-onreceivemanaging-fiber [proto ch id httpkit-data-channel public-channel-rcv comms]
   (record-fiber :api-server-on-receive-managing id (pc/spawn-fiber
     #(try
       (do
@@ -75,8 +75,10 @@
               (debug "[Blazar server API: 'on-receive'-managing fiber] Received client (HTTP) data '" d "' (connection '" id "'), forwarded to handle; looping back")
               (recur))
             (do
-              (debug "[Blazar server API: 'on-receive'-managing fiber] Received nil (connection '" id "'), closing")
+              (debug "[Blazar server API: 'on-receive'-managing fiber] Received nil (connection '" id "'), closing internal channels")
               (close-comms (concat [httpkit-data-channel public-channel-rcv] comms))
+              (debug "[Blazar server API: 'on-receive'-managing fiber] Received nil (connection '" id "'), now closing http-kit's handle")
+              (h/close ch)
               (debug "[Blazar server API: 'on-receive'-managing fiber] Received nil (connection '" id "'), closed and now exiting")
               (unrecord-fiber :api-server-on-receive-managing id)))))
       (catch Throwable t
@@ -85,7 +87,7 @@
           (unrecord-fiber :api-server-on-receive-managing id)
           (throw t)))))))
 
-(defn- spawn-onclosemanaging-fiber [id httpkit-ws-close-channel httpkit-data-channel public-channel-rcv comms]
+(defn- spawn-onclosemanaging-fiber [ch id httpkit-ws-close-channel httpkit-data-channel public-channel-rcv comms]
   (record-fiber :api-server-on-close-managing id (pc/spawn-fiber
     #(try
       (do
@@ -94,8 +96,10 @@
           (do
             (debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), forwarding to handle")
             (pc/snd public-channel-rcv {:ws-close d})
-            (debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), forwarded to handle and now closing")
+            (debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), forwarded to handle and now closing internal channels")
             (close-comms (concat [httpkit-ws-close-channel httpkit-data-channel public-channel-rcv] comms))
+            (debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), now closing http-kit's handle")
+            (h/close ch)
             (debug "[Blazar server API: 'on-close'-managing fiber] Received closing reason '" d "' (connection '" id "'), closed and now exiting")
             (unrecord-fiber :api-server-on-close-managing id))))
       (catch Throwable t
@@ -134,14 +138,14 @@
             (h/on-close ch #(when % (pc/snd httpkit-ws-close-channel %))))
           (spawn-temp-httpresponse-fiber ch-id httpkit-data-channel req))
         (let
-            [proto (if (h/websocket? ch) :ws :http)
-             public-channel-snd (pc/channel)
-            public-channel-rcv (pc/channel)
-            comms [httpkit-data-channel public-channel-snd public-channel-rcv]
-            handle {:ch-id ch-id :snd public-channel-snd :rcv public-channel-rcv}]
+          [proto (if (h/websocket? ch) :ws :http)
+           public-channel-snd (pc/channel)
+           public-channel-rcv (pc/channel)
+           comms [httpkit-data-channel public-channel-snd public-channel-rcv]
+           handle {:ch-id ch-id :snd public-channel-snd :rcv public-channel-rcv}]
           (spawn-server-sending-fiber ch public-channel-snd comms)
-          (spawn-onreceivemanaging-fiber proto ch-id httpkit-data-channel public-channel-rcv comms)
-          (when (= proto :ws) (spawn-onclosemanaging-fiber ch-id httpkit-ws-close-channel httpkit-data-channel public-channel-rcv comms))
+          (spawn-onreceivemanaging-fiber proto ch ch-id httpkit-data-channel public-channel-rcv comms)
+          (when (= proto :ws) (spawn-onclosemanaging-fiber ch ch-id httpkit-ws-close-channel httpkit-data-channel public-channel-rcv comms))
           (send-handle handler-fiber-channels-return-channel [proto handle]))))))
 
 (defn closed? [& args]
