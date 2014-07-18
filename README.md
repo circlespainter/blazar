@@ -1,6 +1,6 @@
 # Blazar - Fiber-blocking HTTP/WebSocket Client and Server APIs
 
-Straightforward, lightning-fast fiber-blocking HTTP/WebSocket Client and Server APIs for Clojure.
+Straightforward, lightning-fast fiber-blocking HTTP / WebSocket Client and Server APIs for Clojure.
 
 *Blazar* uses:
 
