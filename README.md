@@ -7,7 +7,7 @@ Straightforward, lightning-fast fiber-blocking HTTP/WebSocket Client and Server 
 - The [Timbre](https://github.com/ptaoussanis/timbre) Clojure logging framework
 - [http-kit](http://http-kit.org/)'s asynchronous HTTP/WebSocket Server and HTTP Client APIs
 - [Gniazdo](https://github.com/stylefruits/gniazdo)'s asynchronous WebSocket Client API
-- The excellent [Pulsar](https://github.com/puniverse/pulsar) library based on Parallel Universe's Comsat [Pulsar](https://github.com/puniverse/comsat) stack to provide Straightforward, lightning-fast fiber-blocking HTTP/WebSocket Client and Server APIs for Clojure on top of the above
+- The excellent [Pulsar](https://github.com/puniverse/pulsar) library based on Parallel Universe's [Comsat](https://github.com/puniverse/comsat) stack to provide straightforward, lightning-fast fiber-blocking HTTP/WebSocket Client and Server APIs for Clojure on top of the above
 
 Remember to plug Parallel Univers's [Quasar]()'s JVM classes instrumentation.
 
