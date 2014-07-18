@@ -3,7 +3,12 @@
     [co.paralleluniverse.pulsar.core
       :only [spawn-fiber]]
     blazar.http.server
-    clojure.stacktrace))
+    clojure.stacktrace)
+  (:require
+    [taoensso.timbre :as timbre]))
+
+(timbre/set-config! [:timestamp-pattern] "yyyy-MMM-dd HH:mm:ss.SSS ZZ")
+(timbre/set-level! :debug)
 
 (defn -main []
   (let [server (bind "localhost" 8080)]      ; Bind to localhost's IP and 8080 port

@@ -1,9 +1,14 @@
-(ns wsclt
+(ns blazar.examples.wsclt
   (:use
     [co.paralleluniverse.pulsar.core
       :only [spawn-fiber join]]
     blazar.http.client
-    clojure.stacktrace))
+    clojure.stacktrace)
+  (:require
+    [taoensso.timbre :as timbre]))
+
+(timbre/set-config! [:timestamp-pattern] "yyyy-MMM-dd HH:mm:ss.SSS ZZ")
+(timbre/set-level! :debug)
 
 (defn -main []
   (join (spawn-fiber #(try
