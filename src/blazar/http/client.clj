@@ -1,4 +1,5 @@
 (ns blazar.http.client
+	(:import (java.util.concurrent TimeUnit))
 	(:refer-clojure :exclude [promise await])
 	(:require
 		[co.paralleluniverse.pulsar.core :as pc]
@@ -28,11 +29,13 @@
 (deffiberreq http-options :options)
 (deffiberreq http-patch! :patch)
 
+(declare ws-close!)
+
 (pc/defsfn ws-open! [url]
 	(let
 		[
 			ch-session (pc/channel 1)
-			ch-recv (pc/channel -1)
+			ch-recv (pc/channel 1)
 			err (atom nil)
 			closed (atom nil)
 			socket
@@ -54,7 +57,7 @@
 					#(do
 						(debug "[Blazar WS client API: on-close async] Received closing" %1 %2 ", setting to atom")
 						(swap! closed (fn [x] {:code %1 :reason %2}))
-						(pc/spawn-fiber (fn [] (pc/snd ch-recv {:closed @closed})))))
+						(pc/snd ch-recv {:closed @closed})))
 				_ (debug "[Blazar WS client API: ws-open!] waiting for websocket session")
 				session (pc/rcv ch-session)
 				_ (debug "[Blazar WS client API: ws-open!] Got websocket session " session)
@@ -62,20 +65,22 @@
 		(debug "[Blazar WS client API: ws-open!] Connected to" url ", returning handle" ret)
 		ret))
 
-(pc/defsfn ws-rcv [{ch-recv :ch-recv err :err closed :closed}]
+(pc/defsfn ws-rcv [{socket :socket ch-recv :ch-recv err :err closed :closed} & {:keys [close? timeout timeout-unit] :or {close? false timeout -1 timeout-unit (. TimeUnit SECONDS)}}]
 	(cond
-		@closed (do (debug "[Blazar WS client API: ws-recv] Closed handle" @closed) {:closed @closed})
-		@err (do (debug "[Blazar WS client API: ws-recv] Error in handle" @err) (throw @err))
+		@closed (do (debug "[Blazar WS client API: ws-rcv] Closed handle" @closed) {:closed @closed})
+		@err (do (debug "[Blazar WS client API: ws-rcv] Error in handle" @err) (throw @err))
 		:else
 		(let
 				[
-					_ (debug "[Blazar WS client API: ws-rcv!] Receiving from receive channel" ch-recv)
-					msg (pc/rcv ch-recv)
-					ret (if (and (map? msg) (:closed msg)) msg {:value msg})]
-			(debug "[Blazar WS client API: ws-rcv!] Received and returning" ret "from" ch-recv)
+					_ (debug "[Blazar WS client API: ws-rcv] Receiving from receive channel" ch-recv)
+					msg (cond (< timeout 0) (pc/rcv ch-recv) (= timeout 0) (pc/try-rcv ch-recv) (> timeout 0) (pc/rcv ch-recv timeout timeout-unit))
+					ret (if (and (map? msg) (:closed msg)) msg {:value msg})
+				]
+			(debug "[Blazar WS client API: ws-rcv] Received and returning" ret "from" ch-recv)
+			(if close? (do (debug "[Blazar WS client API: ws-rcv] Closing after receive, as requested") (ws-close! socket)))
 			ret)))
 
-(defn ws-snd! [{socket :socket err :err closed :closed} msg]
+(defn ws-snd! [{socket :socket err :err closed :closed} msg & {:keys [close?] :or {close? false}}]
 	(cond
 		@closed (do (debug "[Blazar WS client API: ws-snd!] Closed handle" @closed) {:closed @closed})
 		@err (do (debug "[Blazar WS client API: ws-snd!] Error in handle" @err) (throw @err))
@@ -83,7 +88,8 @@
 		(do
 			(debug "[Blazar WS client API: ws-snd!] Sending" msg "to" socket)
 			(ws/send-msg socket msg)
-			(debug "[Blazar WS client API: ws-snd!] Sent" msg "to" socket))))
+			(debug "[Blazar WS client API: ws-snd!] Sent" msg "to" socket)
+			(if close? (do (debug "[Blazar WS client API: ws-snd!] Closing after send, as requested") (ws-close! socket))))))
 
 (defn ws-close! [{socket :socket err :err closed :closed}]
 	(cond

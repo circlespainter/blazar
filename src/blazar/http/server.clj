@@ -1,5 +1,6 @@
 (ns blazar.http.server
-  (:import (co.paralleluniverse.strands Strand))
+  (:import (co.paralleluniverse.strands Strand)
+					 (java.util.concurrent TimeUnit))
   (:refer-clojure :exclude [promise await])
   (:require
     [clojure.core.match :as m]
@@ -168,23 +169,23 @@
 (defn unbind! [{c :handler-fiber-channels-return-channel f :close-function :as full}]
   "API: destroy an httpkit instance"
   (let
-      [
-				_ (debug "[Blazar server API] Closing connections return channel")
-				_ (pc/close! c)
-				_ (debug "[Blazar server API] Closed connections return channel, unlistening")
-				ret (f)
-				_ (debug "[Blazar server API] Unlistened")
-			]
-    (debug "[Blazar server API] Returning '" ret "'")))
+		[
+			_ (debug "[Blazar server API] Closing connections return channel")
+			_ (pc/close! c)
+			_ (debug "[Blazar server API] Closed connections return channel, unlistening")
+			ret (f)
+			_ (debug "[Blazar server API] Unlistened")
+		]
+		(debug "[Blazar server API] Returning '" ret "'")))
 
-(pc/defsfn listen! [{c :handler-fiber-channels-return-channel :as full}]
-  "Fiber-blocking API: blocks the calling fiber until it gets a new connection handle from
-  a server (or nil if server closed)"
-  (let
-      [_ (debug "[Blazar server API] Getting connection from server")
-       ret (pc/rcv c)]
-    (debug "[Blazar server API] Got connection (or nil) from server: returning '" ret "'")
-    ret))
+(pc/defsfn listen! [{c :handler-fiber-channels-return-channel :as full} & {:keys [timeout timeout-unit] :or {timeout -1 timeout-unit (. TimeUnit SECONDS)}}]
+	"Fiber-blocking API: blocks the calling fiber until it gets a new connection handle from
+	a server (or nil if server closed)"
+	(let
+		[_ (debug "[Blazar server API] Getting connection from server")
+		 ret (cond (< timeout 0) (pc/rcv c) (= timeout 0) (pc/try-rcv c) (> timeout 0) (pc/rcv c timeout timeout-unit))]
+		(debug "[Blazar server API] Got connection (or nil) from server: returning '" ret "'")
+		ret))
 
 (pc/defsfn close!
   "Fiber-blocking API: closes a connection handle"
@@ -195,12 +196,12 @@
       (pc/close! s)
       (debug "[Blazar server API] Closed websocket handle '" id "'")))
 
-(pc/defsfn rcv [[_ {r :rcv id :ch-id} :as full] & {:keys [close?] :or {close? false}}]
+(pc/defsfn rcv [[_ {r :rcv id :ch-id} :as full] & {:keys [close? timeout timeout-unit] :or {close? false timeout -1 timeout-unit (. TimeUnit SECONDS)}}]
   "Fiber-blocking API: blocks the calling fiber until it gets an HTTP message from
   a connection handle (or nil if handle closed)"
   (let
       [_ (debug "[Blazar server API] Getting data from connection '" id "'")
-       ret (pc/rcv r)]
+       ret (cond (< timeout 0) (pc/rcv r) (= timeout 0) (pc/try-rcv r) (> timeout 0) (pc/rcv r timeout timeout-unit))]
     (if close?
       (do
         (debug "[Blazar server API] Got data '" ret "' from connection '" id "', closing as asked")
@@ -210,19 +211,19 @@
     (debug "[Blazar server API] Got data '" ret "' from connection '" id "', returning it")
     ret))
 
-(pc/defsfn snd! [[_ {s :snd  id :ch-id} :as full] data & {:keys [close?] :or {close? false}}]
-  "Fiber-blocking API: sends data to a given connection handle"
-  (if (not (pc/closed? s))
-    (do
-      (debug "[Blazar server API] Sending data '" data "' over open connection '" id "'")
-      (pc/snd s data)
-      (if close?
-        (do
-          (debug "[Blazar server API] Sent data '" data "' over open connection '" id "', closing as asked")
-          (close! full)
-          (debug "[Blazar server API] Sent data '" data "' over open connection '" id "', closed"))
-        (debug "[Blazar server API] Sent data '" data "' over open connection '" id "', asked not to close"))
-      true)
-    (do
-      (debug "[Blazar server API] Sending data '" data "' over open connection '" id "': already closed, not sending")
-      false)))
+(pc/defsfn snd! [[_ {s :snd  id :ch-id} :as full] data & {:keys [close? try?] :or {close? false try? false}}]
+	"Fiber-blocking API: sends data to a given connection handle"
+		(if (not (pc/closed? s))
+			(do
+				(debug "[Blazar server API] Sending data '" data "' over open connection '" id "'")
+				(let [ret (if try? (pc/try-snd s data) (pc/snd s data))]
+					(if close?
+						(do
+							(debug "[Blazar server API] Sent data '" data "' over open connection '" id "', closing as asked")
+							(close! full)
+							(debug "[Blazar server API] Sent data '" data "' over open connection '" id "', closed"))
+						(debug "[Blazar server API] Sent data '" data "' over open connection '" id "', asked not to close"))
+					ret))
+			(do
+				(debug "[Blazar server API] Sending data '" data "' over open connection '" id "': already closed, not sending")
+				false)))

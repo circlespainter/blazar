@@ -11,38 +11,50 @@
 		[taoensso.timbre :as timbre]))
 
 
+
 (timbre/set-config! [:timestamp-pattern] "yyyy-MMM-dd HH:mm:ss.SSS ZZ")
 (timbre/set-level! :info)
 
 
-(deftest test-all []
+
+(deftest test-http []
 
 
 	(pc/defsfn http-req-res []
-		(let [
-			synchronization-channel (pc/channel 1)
+		(let
+			[
+				synchronization-channel (pc/channel 1)
 
-			server-fiber (pc/spawn-fiber
-				#(try (let
-					[srv (bs/bind! "localhost" 8080)
-					 _ (pc/snd synchronization-channel "GO")
-					 handle (bs/listen! srv)
-					 _ (bs/rcv handle)]
-						(bs/snd! handle "Hello world!" :close? true)
-						(pc/rcv synchronization-channel)
-						(bs/unbind! srv))
-					(catch Throwable t (stcktrc/print-cause-trace t) "KO")))
+				server-fiber (pc/spawn-fiber
+					#(try
+						(let
+							[srv (bs/bind! "localhost" 8080)
+						 	_ (pc/snd synchronization-channel "GO")
+						 	handle (bs/listen! srv)
+						 	_ (bs/rcv handle)]
+							(bs/snd! handle "Hello world!" :close? true)
+							(pc/rcv synchronization-channel)
+							(bs/unbind! srv))
+						(catch Throwable t (stcktrc/print-cause-trace t) "KO")))
 
-			client-fiber (pc/spawn-fiber
-				#(try
-					(pc/rcv synchronization-channel)
-					(let [res (bc/http-get "http://localhost:8080")]
-						(pc/snd synchronization-channel "DIE")
-						(:body res))
-			(catch Throwable t (stcktrc/print-cause-trace t) "KO")))]
+					client-fiber (pc/spawn-fiber
+						#(try
+							(pc/rcv synchronization-channel)
+							(let [res (bc/http-get "http://localhost:8080")]
+								(pc/snd synchronization-channel "DIE")
+								(:body res))
+							(catch Throwable t (stcktrc/print-cause-trace t) "KO")))]
 
 			(pc/join server-fiber)
 			(pc/join client-fiber)))
+
+
+	(testing "HTTP GET req/res"
+		(is (= (http-req-res) "Hello world!"))))
+
+
+
+(deftest test-ws []
 
 
 	(pc/defsfn ws-conversation-server-terminated []
@@ -171,9 +183,6 @@
 			(pc/join client-fiber)))
 
 
-	(testing "HTTP GET req/res"
-		(is (= (http-req-res) "Hello world!")))
-
 	(comment (testing "WS conversation server-terminated"
 		(is (= (ws-conversation-server-terminated) "OK"))))
 
@@ -181,4 +190,5 @@
 		(is (= (ws-conversation-client-terminated) "OK"))))
 
 
-(pc/suspendable! test-all)
+(pc/suspendable! test-http)
+(pc/suspendable! test-ws)
