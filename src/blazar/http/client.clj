@@ -13,8 +13,12 @@
 (set! *warn-on-reflection* true)
 
 (defmacro ^:private deffiberreq [n method]
-	`(pc/defsfn ~n [^String ~'url ~'opts]
-		(pc/await ~(symbol "hc" (name method)) ~'url ~'opts)))
+	`(pc/defsfn
+		 ~n
+			([^String ~'url]
+				(pc/await ~(symbol "hc" (name method)) ~'url {}))
+			([^String ~'url ~'opts]
+				(pc/await ~(symbol "hc" (name method)) ~'url ~'opts))))
 
 (deffiberreq http-get :get)
 (deffiberreq http-delete! :delete)
@@ -49,7 +53,8 @@
 					:on-close
 					#(do
 						(debug "[Blazar WS client API: on-close async] Received closing" %1 %2 ", setting to atom")
-						(swap! closed (fn [x] {:code %1 :reason %2}))))
+						(swap! closed (fn [x] {:code %1 :reason %2}))
+						(pc/spawn-fiber (fn [] (pc/snd ch-recv {:closed @closed})))))
 				_ (debug "[Blazar WS client API: ws-open!] waiting for websocket session")
 				session (pc/rcv ch-session)
 				_ (debug "[Blazar WS client API: ws-open!] Got websocket session " session)
@@ -65,7 +70,8 @@
 		(let
 				[
 					_ (debug "[Blazar WS client API: ws-rcv!] Receiving from receive channel" ch-recv)
-					ret {:value (pc/rcv ch-recv)}]
+					msg (pc/rcv ch-recv)
+					ret (if (and (map? msg) (:closed msg)) msg {:value msg})]
 			(debug "[Blazar WS client API: ws-rcv!] Received and returning" ret "from" ch-recv)
 			ret)))
 
