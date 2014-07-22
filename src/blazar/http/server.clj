@@ -232,3 +232,26 @@
       (do
         (debug "[Blazar server API] Sending data '" data "' over open connection '" id "': already closed, not sending")
         false)))
+
+(pc/defsfn start-fiber-ring-adapter [host port handler]
+  (let
+    [server (bind host port)]
+    (loop []
+      (let [[proto _ :as handle] (listen server)]
+        (pc/spawn-fiber
+          #(let [req (rcv handle)]
+            (if (= :http proto)
+              (snd handle (handler req))
+              (throw (RuntimeException. "fiber-ring-adapter: standard ring adapters can't handle websockets")))))
+        (recur)))))
+
+(pc/defsfn start-fiber-server [host port http-handler ws-handler]
+  (let
+    [server (bind host port)]
+    (loop []
+      (let [[proto _ :as handle] (listen server)]
+        (cond
+          (= proto :http) (pc/spawn-fiber #(http-handler handle))
+          (= proto :ws) (pc/spawn-fiber #(ws-handler handle))
+          :else (throw (AssertionError. "This should never happen: protocol should always be :http or :ws")))
+        (recur)))))
