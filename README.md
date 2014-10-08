@@ -1,6 +1,6 @@
 # Blazar - Fiber-blocking HTTP / WebSocket Client and Server APIs
 
-Straightforward, lightning-fast **fiber-blocking HTTP / WebSocket Client and Server APIs for Clojure and fiber-blocking ring adapter**.
+Straightforward, lightning-fast **Client/Server fiber-blocking HTTP and WebSocket APIs** for Clojure, plus a **fiber-blocking ring adapter**.
 
 **Blazar** uses:
 
@@ -44,13 +44,15 @@ The [blazar.examples](../master/src/blazar/examples) package contains complete w
 
 ### HTTP client
 
-The API arguments are fully compatible with [http-kit's client API](http://http-kit.org/client.html) and they are super-simple (fiber-)blocking calls, here's a short example to get started:
+The API arguments are fully compatible with [http-kit's client API](http://http-kit.org/client.html)
 
 ```clojure
 (use '(blazar.http client))
 (use '[co.paralleluniverse.pulsar.core :only (spawn-fiber join)])
 
-(join (spawn-fiber #(http-get "http://localhost:8080")))
+(join (spawn-fiber
+  ; Fiber-blocking call
+  #(http-get "http://localhost:8080")))
 ```
 
 ### WebSocket client
@@ -98,7 +100,8 @@ The API arguments are fully compatible with [http-kit's client API](http://http-
         (:ws-text data)              ; Websocket data
           (if (= data "Close")
             (close handle)           ; Client requested to close, so doing it
-            (snd handle "OK"))       ; Echoing. Optional :close?, :timeout and :timeout-unit parameters
+            (snd handle "OK"))       ; Echoing (fiber-blocking call). Optional :close?, :timeout and
+                                     ; :timeout-unit parameters
         (:ws-close data) nil)        ; Websocket termination, doing nothing
     (= proto :http)                  ; Plain HTTP connection
       (snd handle "Hello world!"))   ; Sends single HTTP response
