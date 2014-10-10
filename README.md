@@ -1,4 +1,5 @@
-# Blazar - Fiber-blocking HTTP / WebSocket Client and Server APIs
+# *Blazar*<br/>Fiber-blocking HTTP / WebSocket Client and Server APIs + Fiber-blocking Ring adapter
+[![Build Status](http://img.shields.io/travis/circlespainter/blazar.svg?style=flat)](https://travis-ci.org/circlespainter/blazar) [![Dependency Status](http://www.versioneye.com/user/projects/54379fd9b2a9c56e38000184/badge.svg?style=flat)](http://www.versioneye.com/user/projects/54379fd9b2a9c56e38000184) [![Version](http://img.shields.io/badge/version-0.1.1-red.svg?style=flat)](https://github.com/circlespainter/lein-capsule) [![License](http://img.shields.io/badge/license-EPL-blue.svg?style=flat)](https://www.eclipse.org/legal/epl-v10.html) [![License](http://img.shields.io/badge/license-LGPL-blue.svg?style=flat)](https://www.gnu.org/licenses/lgpl.html)
 
 Straightforward, lightning-fast **Client/Server fiber-blocking HTTP and WebSocket APIs** for Clojure, plus a **fiber-blocking ring adapter**.
 
@@ -21,13 +22,11 @@ Basic tests run ok, but expect some bumpiness as the project is still **very** y
 
 ## Getting started
 
-With leiningen use:
+With Leiningen:
 
-```clojure
-[com.dreamtimecircles/blazar "0.1.1-SNAPSHOT"]
-```
+[![Clojars Project](http://clojars.org/blazar/latest-version.svg)](http://clojars.org/blazar)
 
-## Usage
+## Examples
 
 The [blazar.examples](../master/src/blazar/examples) package contains complete working examples, a short introduction based on them follows.
 
@@ -115,6 +114,16 @@ The API arguments are fully compatible with [http-kit's client API](http://http-
   (unbind server))))
 ```
 
+## (Some) TODOs
+
+- HTTPS support
+- Fiber-blocking files- and resources- serving middlewares
+- More comprehensive testsuite
+- Reference docs, look into [Codox](https://github.com/weavejester/codox),
+[Marginalia](https://github.com/gdeer81/marginalia) and [lein-html5-docs](https://github.com/tsdh/lein-html5-docs)
+- Consider using [core.typed](https://github.com/clojure/core.typed)
+- More examples
+- Various TODOs in code
 
 ## License
 
@@ -132,5 +141,3 @@ the Eclipse Foundation
 under the terms of the GNU Lesser General Public License version 3.0
 as published by the Free Software Foundation.
 ```
-
-[![githalytics.com alpha](https://cruel-carlota.gopagoda.com/6f172ebdf11f5b084127c9470cc7c887 "githalytics.com")](http://githalytics.com/dreamtimecircles/blazar)

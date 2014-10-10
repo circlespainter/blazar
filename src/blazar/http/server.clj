@@ -1,4 +1,21 @@
-(ns blazar.http.server
+; Blazar: straightforward, lightning-fast Client/Server fiber-blocking
+; HTTP and WebSocket APIs for Clojure, plus a fiber-blocking ring adapter.
+;
+; Copyright (C) 2014 Fabio Tudone. All rights reserved.
+;
+; This program and the accompanying materials are dual-licensed under
+; either the terms of the Eclipse Public License v1.0 as published by
+; the Eclipse Foundation
+;
+;   or (per the licensee's choosing)
+;
+; under the terms of the GNU Lesser General Public License version 3.0
+; as published by the Free Software Foundation.
+
+; TODO Review for compliance with https://github.com/bbatsov/clojure-style-guide
+
+(ns ^{ :author "circlespainter" } blazar.http.server
+  "Blazar Server APIs"
   (:import
     (co.paralleluniverse.strands Strand)
     (java.util.concurrent TimeUnit))
@@ -15,17 +32,16 @@
     [blazar.utils :as utils
       :refer (record-fiber unrecord-fiber)]))
 
+; Some useful predicates
 (def ^:private open? #(not (pc/closed? %)))
 (def ^:private close-if-open #(if (open? %) (pc/close! %)))
 (def ^:private comms-open? #(every? open? %))
 (def ^:private close-comms #(doseq [x %] (if (open? x) (pc/close! x))))
 
-(defn ch-id [ch]
-  (m/match [ch]
-  [[_ {:ch-id id}]] id
-  [ch] (.hashCode ch)))
+(declare ch-id) ; Forward-ref
 
 (defn- spawn-temp-httpresponse-fiber [id httpkit-data-channel req]
+  "Spawns a temporary fiber managing plain HTTP requests"
   (record-fiber :api-server-temp-http-response id (pc/spawn-fiber
     #(try
       (do
@@ -40,6 +56,7 @@
           (throw t)))))))
 
 (defn- spawn-server-sending-fiber [ch public-channel-snd comms]
+  "Spawns a fiber managing send requests"
   (let [id (ch-id ch)]
     (record-fiber :api-server-sending id (pc/spawn-fiber
       #(try
@@ -63,6 +80,7 @@
             (throw t))))))))
 
 (defn- spawn-onreceivemanaging-fiber [proto ch id httpkit-data-channel public-channel-rcv comms]
+  "Spawns a fiber managing the on-receive event"
   (record-fiber :api-server-on-receive-managing id (pc/spawn-fiber
     #(try
       (do
@@ -88,6 +106,7 @@
           (throw t)))))))
 
 (defn- spawn-onclosemanaging-fiber [ch id httpkit-ws-close-channel httpkit-data-channel public-channel-rcv comms]
+  "Spawns a fiber managing the on-close event"
   (record-fiber :api-server-on-close-managing id (pc/spawn-fiber
     #(try
       (do
@@ -109,6 +128,7 @@
           (throw t)))))))
 
 (defn- send-handle [ch [_ {r :rcv id :ch-id} :as h]]
+  "Spawns a fiber that will send an handle over the return channel"
   (do
     (debug "[Blazar server API: http-kit's ring handler] Spawning connection-returning fiber for '" id "'")
     (record-fiber :api-server-temp-handle-returning id (pc/spawn-fiber
@@ -137,19 +157,24 @@
             (h/on-receive ch #(when % (pc/snd httpkit-data-channel %)))
             (h/on-close ch #(when % (pc/snd httpkit-ws-close-channel %))))
           (spawn-temp-httpresponse-fiber ch-id httpkit-data-channel req))
-        (let
-          [proto (if (h/websocket? ch) :ws :http)
-           public-channel-snd (pc/channel)
-           public-channel-rcv (pc/channel)
-           comms [httpkit-data-channel public-channel-snd public-channel-rcv]
-           handle {:ch-id ch-id :snd public-channel-snd :rcv public-channel-rcv}]
+        (let [proto (if (h/websocket? ch) :ws :http)
+              public-channel-snd (pc/channel)
+              public-channel-rcv (pc/channel)
+              comms [httpkit-data-channel public-channel-snd public-channel-rcv]
+              handle {:ch-id ch-id :snd public-channel-snd :rcv public-channel-rcv}]
           (spawn-server-sending-fiber ch public-channel-snd comms)
           (spawn-onreceivemanaging-fiber proto ch ch-id httpkit-data-channel public-channel-rcv comms)
           (when (= proto :ws) (spawn-onclosemanaging-fiber ch ch-id httpkit-ws-close-channel httpkit-data-channel public-channel-rcv comms))
           (send-handle handler-fiber-channels-return-channel [proto handle]))))))
 
+(defn ch-id [ch]
+  "Blazar Server API: returns the ID of the given handle"
+  (m/match [ch]
+           [[_ {:ch-id id}]] id
+           [ch] (.hashCode ch)))
+
 (defn closed? [& args]
-  "API: checks if server and/or connection handles passed in are all closed"
+  "Blazar Server API: checks if server and/or connection handles passed in are all closed"
   (every?
     (fn [handle]
       (m/match
@@ -160,7 +185,8 @@
     args))
 
 (defn bind [& {:keys [ip port wrapping] :or {ip "0.0.0.0" port 8080 wrapping nil} :as args}]
-  "API: creates an httpkit instance whose handler will communicate through Pulsar channels"
+  "Blazar Server API: creates an httpkit instance whose handler will communicate through Pulsar channels"
+  ; TODO De-uglify and cleanup, empty bindings for side-effects are smelly
   (let [_ (debug "[Blazar server API] Binding based on '" args "', creating connection return channel")
         handler-fiber-channels-return-channel (pc/channel)
         f (h/run-server
@@ -172,7 +198,8 @@
     ret))
 
 (defn unbind [{c :handler-fiber-channels-return-channel f :close-function :as full}]
-  "API: destroy an httpkit instance"
+  "Blazar Server API: destroy an httpkit instance"
+  ; TODO De-uglify and cleanup, empty bindings for side-effects are smelly
   (let
     [
       _ (debug "[Blazar server API] Closing connections return channel")
@@ -184,8 +211,9 @@
     (debug "[Blazar server API] Returning '" ret "'")))
 
 (pc/defsfn listen [{c :handler-fiber-channels-return-channel :as full} & {:keys [timeout timeout-unit] :or {timeout -1 timeout-unit (. TimeUnit SECONDS)}}]
-  "Fiber-blocking API: blocks the calling fiber until it gets a new connection handle from
+  "Blazar Fiber-blocking Server API: blocks the calling fiber until it gets a new connection handle from
   a server (or nil if server closed)"
+  ; TODO De-uglify and cleanup, empty bindings for side-effects are smelly
   (let
     [_ (debug "[Blazar server API] Getting connection from server")
      ret (cond (< timeout 0) (pc/rcv c) (= timeout 0) (pc/try-rcv c) (> timeout 0) (pc/rcv c timeout timeout-unit))]
@@ -193,7 +221,7 @@
     ret))
 
 (pc/defsfn close
-  "Fiber-blocking API: closes a connection handle"
+  "Blazar Fiber-blocking Server API: closes a connection handle"
   [[_ {r :rcv s :snd id :ch-id}]]
     (do
       (debug "[Blazar server API] Closing websocket handle '" id "'")
@@ -201,9 +229,12 @@
       (pc/close! s)
       (debug "[Blazar server API] Closed websocket handle '" id "'")))
 
-(pc/defsfn rcv [[_ {r :rcv id :ch-id} :as full] & {:keys [close? timeout timeout-unit] :or {close? false timeout -1 timeout-unit (. TimeUnit SECONDS)}}]
-  "Fiber-blocking API: blocks the calling fiber until it gets an HTTP message from
+(pc/defsfn rcv [[_ {r :rcv id :ch-id} :as full]
+                & {:keys [close? timeout timeout-unit]
+                   :or {close? false timeout -1 timeout-unit (. TimeUnit SECONDS)}}]
+  "Blazar Fiber-blocking Server API: blocks the calling fiber until it gets an HTTP message from
   a connection handle (or nil if handle closed)"
+  ; TODO De-uglify and cleanup, empty bindings for side-effects are smelly
   (let
       [_ (debug "[Blazar server API] Getting data from connection '" id "'")
        ret (cond (< timeout 0) (pc/rcv r) (= timeout 0) (pc/try-rcv r) (> timeout 0) (pc/rcv r timeout timeout-unit))]
@@ -217,7 +248,7 @@
     ret))
 
 (pc/defsfn snd [[_ {s :snd  id :ch-id} :as full] data & {:keys [close? try?] :or {close? false try? false}}]
-  "Fiber-blocking API: sends data to a given connection handle"
+  "Blazar Fiber-blocking Server API: sends data to a given connection handle"
     (if (not (pc/closed? s))
       (do
         (debug "[Blazar server API] Sending data '" data "' over open connection '" id "'")
@@ -234,8 +265,8 @@
         false)))
 
 (pc/defsfn start-fiber-ring-adapter [host port handler]
-  (let
-    [server (bind host port)]
+  "Blazar Fiber-blocking Server API: Starts a new Fiber-blocking ring adapter on the given interface and port with the given ring handler"
+  (let [server (bind host port)]
     (loop []
       (let [[proto _ :as handle] (listen server)]
         (pc/spawn-fiber
@@ -246,8 +277,8 @@
         (recur)))))
 
 (pc/defsfn start-fiber-server [host port http-handler ws-handler]
-  (let
-    [server (bind host port)]
+  "Starts a new Fiber-blocking HTTP + WebSocket server on the given interface and port with the given protocol handlers"
+  (let [server (bind host port)]
     (loop []
       (let [[proto _ :as handle] (listen server)]
         (cond

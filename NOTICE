@@ -1,0 +1,48 @@
+This product depends on Pulsar, Lightweight threads, Go-like channels, and Erlang-like actors for Clojure
+
+    Copyright (c) 2014, Parallel Universe Software Co. and Contributors. All rights reserved.
+    * LICENSE: Either Eclipse Public License v1.0 (http://www.eclipse.org/legal/epl-v10.html) or
+               GNU Lesser General Public License version 3.0 (https://www.gnu.org/licenses/lgpl.html)
+    * HOMEPAGE: https://github.com/puniverse/pulsar
+
+This product depends on ns-tracker, a Clojure library for keeping track of changes to source files and their associated namespaces
+
+	Copyright © 2014 James Reeves, Stuart Sierra
+	* LICENSE: Eclipse Public License v1.0 (http://www.eclipse.org/legal/epl-v10.html)
+	* HOMEPAGE: https://github.com/weavejester/ns-tracker
+
+This product depends on Gniazdo, a minimalist, efficient, Ring-compatible HTTP client/server for Clojure
+
+	Copyright 2013 stylefruits GmbH
+	* LICENSE: Apache License Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0.html)
+	* HOMEPAGE: https://github.com/stylefruits/gniazdo
+
+This product depends on HTTP Kit, a minimalist, efficient, Ring-compatible HTTP client/server for Clojure
+
+	Copyright © 2012-2013 Feng Shen
+	* LICENSE: Apache License Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0.html)
+	* HOMEPAGE: http://http-kit.org/
+
+This product depends on Timbre, a (sane) Clojure logging & profiling library
+
+	Copyright © 2012-2014 Peter Taoussanis
+	* LICENSE: Eclipse Public License v1.0 (http://www.eclipse.org/legal/epl-v10.html)
+	* HOMEPAGE: https://github.com/ptaoussanis/timbre
+
+This product depends on Clojure, a Lisp dialect that targets the Java Virtual Machine (and the CLR, and JavaScript)
+
+    Copyright (c) Rich Hickey. All rights reserved.
+    * LICENSE: Eclipse Public License v1.0 (http://opensource.org/licenses/eclipse-1.0.php)
+    * HOMEPAGE: http://clojure.org
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
+LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
